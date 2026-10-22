@@ -1,6 +1,0 @@
-# DOMAIN vient du .env. Domaine public : certificat Let's Encrypt automatique.
-# Nom interne (ex. simplimo.lan) : certificat interne Caddy (installer son CA racine sur les téléphones).
-{$DOMAIN} {
-	tls internal
-	reverse_proxy app:3000
-}
