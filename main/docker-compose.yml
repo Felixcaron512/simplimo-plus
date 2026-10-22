@@ -1,0 +1,58 @@
+# Production : docker compose up -d --build
+# Avec reverse proxy HTTPS intégré (Caddy) : docker compose --profile proxy up -d --build
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: simplimo
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?définir POSTGRES_PASSWORD dans .env}
+      POSTGRES_DB: simplimo
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U simplimo -d simplimo"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DB_CLIENT: pg
+      PG_URL: postgres://simplimo:${POSTGRES_PASSWORD}@db:5432/simplimo
+      UPLOAD_DIR: /app/data/uploads
+      BACKUP_DIR: /app/data/backups
+      PORT: "9443"
+      SSL_CERT: ""
+      SSL_KEY: ""
+    volumes:
+      - uploads:/app/data/uploads
+      - backups:/app/data/backups
+    ports:
+      - "9443:9443"   # retirer si seul Caddy / votre reverse proxy est exposé
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["proxy"]
+    restart: unless-stopped
+    depends_on: [app]
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+
+volumes:
+  pgdata:
+  uploads:
+  backups:
+  caddy_data:
